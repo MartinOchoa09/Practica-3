@@ -1,32 +1,42 @@
 import threading
 import time
+import random
 
-semaphore = threading.Semaphore(1)
+semaphore = threading.Semaphore(value=10)
+bebidas_disponibles = 10
 
-shared_resource = 0
-
-def critical_section():
-    global shared_resource
-    semaphore.acquire()
+def maquina_expendora():
+    global bebidas_disponibles
     
-    try:
-        print(f'{threading.current_thread().name} entró a la sección crítica')
-        shared_resource += 1
-        time.sleep(2)
-        print(f'{threading.current_thread().name} salió de la sección crítica. Recurso compartido: {shared_resource}')
-    finally:
-        semaphore.release()
+    while True: 
+        if bebidas_disponibles == 0:
+            print('La máquina expendedora se quedó sin bebidas')
+            break 
+            
+        print('Máquina expendedora lista, con 10 bebidas disponibles')
+        time.sleep(random.uniform(0.5, 2.0))
+        
+def persona():
+    global bebidas_disponibles
+    
+    with semaphore:
+        if bebidas_disponibles > 0:
+            bebidas_disponibles -= 1
+            print(f'Persona compra una bebida')
+            print(f'Quedan {bebidas_disponibles} bebidas disponibles')
+            print(f'Persona sale con su bebida')
+            time.sleep(random.uniform(1.0, 3.0))
 
-def worker():
-    for _ in range(3): 
-        critical_section()
+maquina_thread = threading.Thread(target=maquina_expendora)
+maquina_thread.start()
 
-thread1 = threading.Thread(target=worker, name='Hilo 1')
-thread2 = threading.Thread(target=worker, name='Hilo 2')
+threads_personas = []
+for i in range(10):
+    persona_thread = threading.Thread(target=persona)
+    threads_personas.append(persona_thread)
+    persona_thread.start()
 
+for persona_thread in threads_personas:
+    persona_thread.join()
 
-thread1.start()
-thread2.start()
-
-thread1.join()
-thread2.join()
+maquina_thread.join()

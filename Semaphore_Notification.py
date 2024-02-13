@@ -1,49 +1,49 @@
 import threading
 import time
+import random
 
-class RecursoCompartido:
-    def __init__(self):
-        self.semaphore = threading.Semaphore(value=1)
-        self.valor = 0
-        self.condicion = threading.Condition()
+semaphore = threading.Semaphore(value=10)
+condicion = threading.Condition()
+bebidas_disponibles = 10
+num_compras = 10
 
-    def incrementar_valor(self):
-        with self.semaphore:
-            self.valor += 1
+def maquina_expendora():
+    global bebidas_disponibles
+    
+    while True: 
+        with condicion:
+            if bebidas_disponibles == 0:
+                print('La máquina expendedora se quedó sin bebidas')
+                break 
             
-    def es_valor_par(self):
-        return self.valor % 2 == 0
+            print('Máquina expendedora lista, con 10 bebidas disponibles')
+            condicion.notify_all()
 
-    def obtener_valor(self):
-        with self.semaphore:
-            return self.valor
+        time.sleep(random.uniform(0.5, 2.0))
+        
+def persona():
+    global bebidas_disponibles
+    
+    with semaphore:
+        with condicion:
+            condicion.wait()
+            if bebidas_disponibles > 0:
+                bebidas_disponibles -= 1
+                print(f'Persona compra una bebida')
+                print(f'Quedan {bebidas_disponibles} bebidas disponibles')
+                time.sleep(random.uniform(1.0, 3.0))
+                print(f'Persona sale con su bebida')
 
-    def notificar_cambio(self):
-        with self.condicion:
-            self.condicion.notify()
+maquina_thread = threading.Thread(target=maquina_expendora)
+maquina_thread.start()
 
-def productor(recurso_compartido):
-    for _ in range(5):
-        time.sleep(1)
-        recurso_compartido.incrementar_valor()
-        print(f"Producido: {recurso_compartido.obtener_valor()}")
-        recurso_compartido.notificar_cambio()
+threads_personas = []
+for i in range(num_compras):
+    persona_thread = threading.Thread(target=persona)
+    threads_personas.append(persona_thread)
+    persona_thread.start()
 
-def consumidor(recurso_compartido):
-    with recurso_compartido.condicion:
-        try:
-            recurso_compartido.condicion.wait_for(recurso_compartido.es_valor_par)
-            print(f"Consumido: {recurso_compartido.obtener_valor()}")
-        except threading.ThreadError as e:
-            print(f"Error en el consumidor: {e}")
+for persona_thread in threads_personas:
+    persona_thread.join()
 
-recurso_compartido = RecursoCompartido()
-
-hilo_productor = threading.Thread(target=productor, args=(recurso_compartido,))
-hilo_consumidor = threading.Thread(target=consumidor, args=(recurso_compartido,))
-
-hilo_productor.start()
-hilo_consumidor.start()
-
-hilo_productor.join()
-hilo_consumidor.join()
+maquina_thread.join()
